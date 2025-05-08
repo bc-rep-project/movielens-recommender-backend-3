@@ -1,0 +1,36 @@
+# Web Framework
+fastapi==0.104.1
+pydantic==2.4.2
+pydantic-settings==2.0.3
+uvicorn[standard]==0.23.2
+email-validator==2.0.0
+
+# Database
+motor==3.3.1
+pymongo==4.5.0
+redis==5.0.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+httpx==0.25.0
+
+# Utilities
+python-multipart==0.0.6
+python-dotenv==1.0.0
+loguru==0.7.2
+
+# Google Cloud (for pipeline triggering)
+google-cloud-pubsub==2.18.4
+google-cloud-storage==2.12.0
+
+# Data Science / ML
+numpy==1.26.4
+scipy==1.13.0
+scikit-learn==1.4.2
+# Comment out temporarily if space is an issue
+# sentence-transformers==2.2.2
+
+# Add PyJWT to your requirements
+PyJWT==2.8.0
+pyjwt==2.8.0 

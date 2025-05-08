@@ -1,0 +1,147 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+nosetests.xml
+coverage.xml
+
+# Temporary files
+*.bak
+*.tmp
+.temp/
+tmp/
+
+# Documentation
+docs/_build/
+
+# Data
+data/
+*.csv
+*.json
+*.pkl
+*.npy
+*.npz
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# MongoDB local data
+db_data/
+
+# Redis
+dump.rdb
+
+deploy.sh
+deploy_simple.sh
+deploy_minimal.sh
+
+# Docker
+Dockerfile
+Dockerfile.simple
+Dockerfile.minimal
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Environment variables and secrets
+.env
+*.env
+.env.*
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Python distribution / packaging
+dist/
+build/
+*.egg-info/
+eggs/
+.eggs/
+
+# Unit test and coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Logs
+logs/
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# MongoDB data directory if local
+data/db/
+
+# Redis dump files
+*.rdb
+dump.rdb
+
+# Local development configuration
+local_settings.py
+dev_settings.py
+
+# Documentation
+docs/_build/
+
+# Temp files
+.tmp/
+tmp/
