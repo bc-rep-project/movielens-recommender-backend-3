@@ -1,0 +1,28 @@
+runtime: python
+env: flex
+entrypoint: gunicorn --bind :$PORT --workers 1 --timeout 0 --worker-class uvicorn.workers.UvicornWorker app.main:app
+
+runtime_config:
+  python_version: 3.9
+
+env_variables:
+  ENV: "production"
+  CLOUD_RUN: "true"
+  LOG_LEVEL: "INFO"
+  PYTHONPATH: "/app"
+
+manual_scaling:
+  instances: 1
+
+resources:
+  cpu: 1
+  memory_gb: 0.5
+  disk_size_gb: 10
+
+readiness_check:
+  path: "/_ah/health"
+  check_interval_sec: 10
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+  app_start_timeout_sec: 300 
