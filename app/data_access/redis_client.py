@@ -78,13 +78,23 @@ class CacheRepository:
         try:
             redis_client = self.get_redis()
             if not redis_client:
+                logger.debug(f"Redis not available, skipping delete_pattern for: {pattern}")
                 return 0
             
-            keys = redis_client.keys(pattern)
-            if not keys:
+            # Check if keys method is available (some Redis clients might not support it)
+            if not hasattr(redis_client, 'keys'):
+                logger.warning("Redis client does not support 'keys' method")
                 return 0
                 
-            return redis_client.delete(*keys)
+            try:
+                keys = redis_client.keys(pattern)
+                if not keys:
+                    return 0
+                    
+                return redis_client.delete(*keys)
+            except redis.exceptions.ResponseError as e:
+                logger.warning(f"Redis pattern matching error: {e}")
+                return 0
         except Exception as e:
             logger.error(f"Error in CacheRepository.delete_pattern: {e}")
             return 0 

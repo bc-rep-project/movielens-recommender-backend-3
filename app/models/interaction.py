@@ -7,7 +7,7 @@ from .movie import PyObjectId
 
 class InteractionBase(BaseModel):
     """Base Interaction model with common fields"""
-    userId: str
+    userId: Optional[str] = None  # Make userId optional since we'll get it from token
     movieId: str  # This is the MongoDB _id of the movie
     type: Literal["rate", "view"] = "view"
     value: Optional[float] = None  # Rating value (1-5) if type is "rate"

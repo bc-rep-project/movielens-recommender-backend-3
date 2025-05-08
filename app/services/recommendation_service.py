@@ -42,6 +42,9 @@ class RecommendationService:
             List of recommended movies
         """
         try:
+            # Add debug logging
+            logger.debug(f"Getting recommendations for user_id: {user_id}, limit: {limit}, exclude_seen: {exclude_seen}")
+            
             # Check cache first
             cache_key = f"recommendations:user:{user_id}:{limit}:{exclude_seen}"
             cached_recommendations = self.cache_repo.get_json(cache_key)
@@ -52,41 +55,61 @@ class RecommendationService:
                 
             # Content-based approach:
             # 1. Get user's highly rated movies
+            logger.debug(f"Fetching user interactions for {user_id}")
             user_movies = await self.interaction_repo.get_user_interactions(
                 user_id=user_id,
                 limit=10  # Consider only the most recent interactions
             )
             
+            logger.debug(f"Found {len(user_movies)} user interactions")
             if not user_movies:
                 logger.info(f"No interactions found for user {user_id}, using default recommendations")
                 # Fall back to popular movies
                 return await self._get_default_recommendations(limit)
             
+            # Log some details about the interactions found
+            logger.debug(f"User interactions sample: {user_movies[:2]}")
+            
             # 2. Get embeddings for user's favorite movies
             movie_scores = {}  # Will store movie_id -> similarity score
             
             # Get movies the user has already seen/rated
-            seen_movie_ids = [] if not exclude_seen else \
-                await self.interaction_repo.get_user_movie_ids(user_id)
+            if exclude_seen:
+                logger.debug(f"Fetching movies user {user_id} has already seen")
+                seen_movie_ids = await self.interaction_repo.get_user_movie_ids(user_id)
+                logger.debug(f"User has seen {len(seen_movie_ids)} movies")
+            else:
+                seen_movie_ids = []
             
             # Process each movie the user has interacted with
             for interaction in user_movies:
                 movie_id = interaction.get("movie_id")
                 if not movie_id:
+                    logger.warning(f"Interaction missing movie_id field: {interaction}")
                     continue
                     
                 # Give more weight to higher ratings
-                interaction_weight = interaction.get("value", 3) / 5  # Normalize to 0-1
+                value = interaction.get("value")
+                # Make sure we have a numeric value
+                if value is None:
+                    interaction_weight = 0.6  # Default weight if no value
+                    logger.debug(f"No rating value for movie {movie_id}, using default weight {interaction_weight}")
+                else:
+                    interaction_weight = float(value) / 5.0  # Normalize to 0-1
+                logger.debug(f"Processing movie {movie_id} with weight {interaction_weight}")
                 
                 # Get this movie's embedding
                 source_embedding = await self.movie_repo.get_embedding(movie_id)
                 if not source_embedding:
+                    logger.warning(f"No embedding found for movie {movie_id}")
                     continue
                 
                 # Compare it to other movies
                 # We can optimize this by getting all embeddings at once or using a vector DB
                 # But for now, we'll do it one by one
+                logger.debug(f"Fetching candidate movies to compare with {movie_id}")
                 candidate_movies = await self.movie_repo.get_movies(limit=100)  # Get candidates
+                logger.debug(f"Found {len(candidate_movies)} candidate movies")
                 
                 for candidate in candidate_movies:
                     candidate_id = str(candidate.get("_id"))
@@ -105,18 +128,23 @@ class RecommendationService:
                         continue
                     
                     # Calculate similarity
-                    similarity = 1 - cosine(source_embedding, candidate_embedding)
-                    
-                    # Apply weight from the interaction
-                    weighted_similarity = similarity * interaction_weight
-                    
-                    # Update score (sum of weighted similarities)
-                    if candidate_id in movie_scores:
-                        movie_scores[candidate_id] += weighted_similarity
-                    else:
-                        movie_scores[candidate_id] = weighted_similarity
+                    try:
+                        similarity = 1 - cosine(source_embedding, candidate_embedding)
+                        
+                        # Apply weight from the interaction
+                        weighted_similarity = similarity * interaction_weight
+                        
+                        # Update score (sum of weighted similarities)
+                        if candidate_id in movie_scores:
+                            movie_scores[candidate_id] += weighted_similarity
+                        else:
+                            movie_scores[candidate_id] = weighted_similarity
+                    except Exception as e:
+                        logger.error(f"Error calculating similarity between {movie_id} and {candidate_id}: {e}")
+                        continue
             
             # Sort movies by total score
+            logger.debug(f"Calculated scores for {len(movie_scores)} movies")
             sorted_movies = sorted(
                 movie_scores.items(), 
                 key=lambda x: x[1], 
@@ -125,14 +153,26 @@ class RecommendationService:
             
             # Get top N movies
             top_movie_ids = [movie_id for movie_id, _ in sorted_movies[:limit]]
+            logger.debug(f"Top movie IDs: {top_movie_ids}")
             
             # Get full details for top movies
             recommendations = []
             for movie_id in top_movie_ids:
-                movie = await self.movie_repo.get_by_id(movie_id)
-                if movie:
-                    movie["_id"] = str(movie["_id"])
-                    recommendations.append(MovieResponse(**movie))
+                try:
+                    movie = await self.movie_repo.get_by_id(movie_id)
+                    if movie:
+                        # Create a properly formatted dict for MovieResponse
+                        movie_response_dict = {
+                            "id": str(movie["_id"]),  # Map _id to id
+                            "title": movie["title"],
+                            "genres": movie["genres"],
+                            "year": movie.get("year")  # This field is optional
+                        }
+                        recommendations.append(MovieResponse(**movie_response_dict))
+                except Exception as e:
+                    logger.error(f"Error creating MovieResponse for movie {movie_id}: {e}")
+            
+            logger.debug(f"Returning {len(recommendations)} recommendations")
             
             # Cache the results
             if recommendations:
@@ -145,10 +185,10 @@ class RecommendationService:
             return recommendations
                 
         except Exception as e:
-            logger.error(f"Error getting recommendations for user: {str(e)}")
+            logger.error(f"Error getting recommendations for user: {str(e)}", exc_info=True)
             return []
     
-    async def get_similar_movies(self, movie_id: str, limit: int = 10) -> List[MovieResponse]:
+    async def get_similar_movies(self, movie_id: str, limit: int = 10) -> List[RecommendationResponse]:
         """
         Get movies similar to the specified movie
         
@@ -157,7 +197,7 @@ class RecommendationService:
             limit: Number of similar movies to return
             
         Returns:
-            List of similar movies
+            List of similar movies as RecommendationResponse objects
         """
         try:
             # Check cache first
@@ -166,7 +206,7 @@ class RecommendationService:
             
             if cached_recommendations:
                 logger.debug(f"Cache hit for similar movies: {cache_key}")
-                return [MovieResponse(**movie) for movie in cached_recommendations]
+                return [RecommendationResponse(**rec) for rec in cached_recommendations]
             
             # Get the source movie's embedding
             source_embedding = await self.movie_repo.get_embedding(movie_id)
@@ -190,29 +230,49 @@ class RecommendationService:
                 if not candidate_embedding:
                     continue
                 
-                # Calculate similarity
-                similarity = 1 - cosine(source_embedding, candidate_embedding)
-                similarities.append((candidate_id, similarity))
+                try:
+                    # Calculate similarity
+                    similarity = 1 - cosine(source_embedding, candidate_embedding)
+                    similarities.append((candidate_id, similarity))
+                except Exception as e:
+                    logger.error(f"Error calculating similarity between {movie_id} and {candidate_id}: {e}")
+                    continue
             
             # Sort by similarity
             sorted_similarities = sorted(similarities, key=lambda x: x[1], reverse=True)
             
-            # Get top N movies
-            top_movie_ids = [movie_id for movie_id, _ in sorted_similarities[:limit]]
+            # Get top N movies with their similarity scores
+            top_movie_pairs = sorted_similarities[:limit]
             
             # Get full details for top movies
             similar_movies = []
-            for movie_id in top_movie_ids:
-                movie = await self.movie_repo.get_by_id(movie_id)
-                if movie:
-                    movie["_id"] = str(movie["_id"])
-                    similar_movies.append(MovieResponse(**movie))
+            for similar_id, similarity_score in top_movie_pairs:
+                try:
+                    movie = await self.movie_repo.get_by_id(similar_id)
+                    if movie:
+                        # Create a properly formatted dict for MovieResponse
+                        movie_response_dict = {
+                            "id": str(movie["_id"]),  # Map _id to id
+                            "title": movie["title"],
+                            "genres": movie["genres"],
+                            "year": movie.get("year")  # This field is optional
+                        }
+                        movie_response = MovieResponse(**movie_response_dict)
+                        
+                        # Create Recommendation response with movie and score
+                        recommendation = RecommendationResponse(
+                            movie=movie_response,
+                            score=float(similarity_score)
+                        )
+                        similar_movies.append(recommendation)
+                except Exception as e:
+                    logger.error(f"Error creating RecommendationResponse for similar movie {similar_id}: {e}")
             
             # Cache the results
             if similar_movies:
                 self.cache_repo.set_json(
                     cache_key,
-                    [movie.dict() for movie in similar_movies],
+                    [rec.dict() for rec in similar_movies],
                     settings.RECOMMENDATIONS_CACHE_TTL
                 )
                 
@@ -232,10 +292,21 @@ class RecommendationService:
             # For now, just get the first N movies sorted by default
             movies = await self.movie_repo.get_movies(limit=limit)
             
-            return [
-                MovieResponse(**{**movie, "_id": str(movie["_id"])}) 
-                for movie in movies
-            ]
+            recommendations = []
+            for movie in movies:
+                try:
+                    # Create a properly formatted dict for MovieResponse
+                    movie_response_dict = {
+                        "id": str(movie["_id"]),  # Map _id to id
+                        "title": movie["title"],
+                        "genres": movie["genres"],
+                        "year": movie.get("year")  # This field is optional
+                    }
+                    recommendations.append(MovieResponse(**movie_response_dict))
+                except Exception as e:
+                    logger.error(f"Error creating MovieResponse for default recommendation: {e}")
+            
+            return recommendations
             
         except Exception as e:
             logger.error(f"Error getting default recommendations: {str(e)}")

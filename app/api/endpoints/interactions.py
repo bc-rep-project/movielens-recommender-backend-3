@@ -3,6 +3,7 @@ from ...services.interaction_service import interaction_service, InteractionServ
 from ...models.interaction import InteractionCreate, InteractionRead
 from ..deps import get_current_user_id
 from typing import List, Dict, Any
+from loguru import logger
 
 router = APIRouter()
 
@@ -15,14 +16,28 @@ async def create_interaction(
     Create a new interaction (rating, view) for the authenticated user
     """
     try:
-        result = await interaction_service.create_interaction(
-            user_id=user_id,
-            interaction_data=interaction
-        )
+        logger.info(f"Creating interaction with user_id {user_id} and data: {interaction.dict()}")
+        
+        # Initialize response
+        result = None
+        
+        # Call interaction service
+        try:
+            result = await interaction_service.create_interaction(
+                user_id=user_id,
+                interaction_data=interaction
+            )
+            logger.info(f"Interaction created successfully: {result}")
+        except Exception as service_error:
+            logger.error(f"Error in interaction_service.create_interaction: {service_error}")
+            raise
+            
         return result
     except InteractionServiceError as e:
+        logger.error(f"InteractionServiceError: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Unhandled error in create_interaction: {str(e)}, type: {type(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating interaction: {str(e)}")
 
 @router.get("/me")

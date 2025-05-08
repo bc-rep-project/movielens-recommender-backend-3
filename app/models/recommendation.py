@@ -10,30 +10,6 @@ class Recommendation(BaseModel):
     score: float = Field(..., description="Recommendation score/relevance (higher is more relevant)")
     
 
-class UserRecommendationResponse(BaseModel):
-    """Response model for user recommendations"""
-    userId: str
-    recommendations: List[Recommendation]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda dt: dt.isoformat()
-        }
-
-
-class ItemRecommendationResponse(BaseModel):
-    """Response model for item (movie) recommendations"""
-    movieId: str
-    similar_items: List[Recommendation]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda dt: dt.isoformat()
-        }
-
-
 class RecommendationResponse(BaseModel):
     """Model for movie recommendations returned by the API"""
     movie: MovieResponse
@@ -50,6 +26,30 @@ class RecommendationResponse(BaseModel):
                 },
                 "score": 0.98
             }
+        }
+
+
+class UserRecommendationResponse(BaseModel):
+    """Response model for user recommendations"""
+    userId: str
+    recommendations: List[Recommendation]
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()
+        }
+
+
+class ItemRecommendationResponse(BaseModel):
+    """Response model for item (movie) recommendations"""
+    movieId: str
+    similar_items: List[RecommendationResponse]
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat()
         }
 
 

@@ -22,21 +22,26 @@ class InteractionService:
         Create a new user interaction (e.g., rating, view)
         
         Args:
-            user_id: ID of the user performing the interaction
+            user_id: ID of the user performing the interaction (from token)
             interaction_data: Interaction data like movie_id, type, value
             
         Returns:
             Dictionary with interaction details, including ID
         """
         try:
+            # Use token user_id if not provided in request body
+            effective_user_id = interaction_data.userId or user_id
+            
             # Create interaction document
             interaction_doc = {
-                "user_id": user_id,
-                "movie_id": interaction_data.movie_id,
+                "user_id": effective_user_id,
+                "movie_id": interaction_data.movieId,
                 "type": interaction_data.type,
                 "value": interaction_data.value,
                 "timestamp": datetime.utcnow()
             }
+            
+            logger.debug(f"Creating interaction: {interaction_doc}")
             
             # Save to database
             result_id = await self.interaction_repo.create_interaction(interaction_doc)
@@ -44,14 +49,27 @@ class InteractionService:
             if not result_id:
                 raise InteractionServiceError("Failed to create interaction")
                 
-            # Invalidate cached recommendations for this user
-            self.cache_repo.delete_pattern(f"recommendations:user:{user_id}:*")
+            # Invalidate cached recommendations for this user - handle potential Redis failures
+            try:
+                self.cache_repo.delete_pattern(f"recommendations:user:{effective_user_id}:*")
+            except Exception as cache_error:
+                logger.warning(f"Failed to invalidate cache: {cache_error}")
+                # Continue execution even if cache invalidation fails
             
-            # Return interaction with ID
-            return {
-                "id": result_id,
-                **interaction_doc
+            # Create a new response object with only JSON serializable fields
+            response_doc = {
+                "id": str(result_id),
+                "user_id": effective_user_id,
+                "movie_id": interaction_data.movieId,
+                "type": interaction_data.type,
+                "value": interaction_data.value,
+                "timestamp": interaction_doc["timestamp"].isoformat()
             }
+            
+            # Log the response document for debugging
+            logger.debug(f"Response document: {response_doc}")
+            
+            return response_doc
             
         except Exception as e:
             logger.error(f"Error creating interaction: {str(e)}")
@@ -96,17 +114,25 @@ async def get_user_rated_movies(user_id: str, min_rating: float = 3.5, limit: in
     """
     db = get_database()
     
+    # Log the query for debugging
+    logger.debug(f"Querying highly rated movies for user_id: {user_id}, min_rating: {min_rating}")
+    
     cursor = db.interactions.find(
         {
-            "userId": user_id,
+            "user_id": user_id,
             "type": "rate",
             "value": {"$gte": min_rating}
         },
-        {"movieId": 1}
+        {"movie_id": 1}
     ).sort("timestamp", -1).limit(limit)
     
     interactions = await cursor.to_list(length=limit)
-    return [interaction["movieId"] for interaction in interactions]
+    result = [interaction["movie_id"] for interaction in interactions if "movie_id" in interaction]
+    
+    # Log the number of movies found
+    logger.debug(f"Found {len(result)} highly rated movies for user: {user_id}")
+    
+    return result
 
 
 async def get_user_viewed_movies(user_id: str) -> List[str]:
@@ -115,10 +141,18 @@ async def get_user_viewed_movies(user_id: str) -> List[str]:
     """
     db = get_database()
     
+    # Log the query for debugging
+    logger.debug(f"Querying all viewed movies for user_id: {user_id}")
+    
     cursor = db.interactions.find(
-        {"userId": user_id},
-        {"movieId": 1}
+        {"user_id": user_id},
+        {"movie_id": 1}
     )
     
     interactions = await cursor.to_list(length=None)
-    return [interaction["movieId"] for interaction in interactions] 
+    result = [interaction["movie_id"] for interaction in interactions if "movie_id" in interaction]
+    
+    # Log the number of movies found
+    logger.debug(f"Found {len(result)} viewed movies for user: {user_id}")
+    
+    return result 

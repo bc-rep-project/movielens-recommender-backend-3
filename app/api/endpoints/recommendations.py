@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Path, Query
 from typing import List, Dict, Any, Optional
 from ...core.auth import get_current_user
-from ...services import recommendation_service
+from ...services.recommendation_service import recommendation_service
 from ...services.movie_service import movie_service
 from ...core.config import settings
 from ...models.recommendation import UserRecommendationResponse, ItemRecommendationResponse

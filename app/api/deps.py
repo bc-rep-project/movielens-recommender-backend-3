@@ -4,6 +4,7 @@ from ..services.auth_service import verify_token
 from ..core.database import get_database, get_redis
 from ..services.movie_service import movie_service
 from typing import Optional
+from loguru import logger
 
 security = HTTPBearer()
 
@@ -14,7 +15,23 @@ async def get_current_user_id(
     Get current user ID from JWT token
     """
     token = credentials.credentials
-    payload = await verify_token(token)
+    result = await verify_token(token)
+    
+    # Handle tuple return value (is_valid, payload) from auth_service.verify_token
+    if isinstance(result, tuple) and len(result) == 2:
+        is_valid, payload = result
+        if not is_valid:
+            logger.error(f"Token verification failed: {payload.get('error', 'Unknown error')}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # If valid, use the payload
+        payload = result[1]
+    else:
+        # Direct payload return from core.auth.verify_token
+        payload = result
     
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -37,7 +54,19 @@ async def get_optional_user_id(
         
     token = auth_header.replace("Bearer ", "")
     try:
-        payload = await verify_token(token)
+        result = await verify_token(token)
+        
+        # Handle tuple return value (is_valid, payload) from auth_service.verify_token
+        if isinstance(result, tuple) and len(result) == 2:
+            is_valid, payload = result
+            if not is_valid:
+                return None
+            # If valid, use the payload
+            payload = result[1]
+        else:
+            # Direct payload return from core.auth.verify_token
+            payload = result
+            
         if payload and "sub" in payload:
             return payload["sub"]
     except:
