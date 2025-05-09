@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Union, Optional
 from pydantic import AnyHttpUrl, field_validator, Field, ValidationInfo
 from pydantic_settings import BaseSettings
@@ -22,20 +23,48 @@ class Settings(BaseSettings):
     
     @field_validator("CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        if isinstance(v, str) and not v.startswith("["):
+        # Try to parse as JSON first
+        if isinstance(v, str):
+            try:
+                # If string starts with [ and ends with ], try to parse as JSON
+                if v.startswith("[") and v.endswith("]"):
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return parsed
+            except json.JSONDecodeError:
+                # If JSON parsing fails, fall back to comma-separated
+                pass
+                
+            # If not a JSON array, treat as comma-separated
             return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+        elif isinstance(v, list):
             return v
-        raise ValueError(v)
+        raise ValueError(f"Invalid CORS_ORIGINS value: {v}")
     
     # Backwards compatibility for BACKEND_CORS_ORIGINS
     BACKEND_CORS_ORIGINS: Optional[str] = None
     
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", mode="after")
     def use_legacy_cors_if_present(cls, v, info: ValidationInfo):
-        backend_cors = info.data.get("BACKEND_CORS_ORIGINS")
-        if backend_cors and not v:
-            return backend_cors
+        if not v:
+            backend_cors = info.data.get("BACKEND_CORS_ORIGINS")
+            if backend_cors:
+                # Process backend_cors if it's not empty
+                if isinstance(backend_cors, str):
+                    try:
+                        # Try to parse as JSON
+                        if backend_cors.startswith("[") and backend_cors.endswith("]"):
+                            parsed = json.loads(backend_cors)
+                            if isinstance(parsed, list):
+                                return parsed
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, fall back to comma-separated
+                        pass
+                    
+                    # If not a JSON array, treat as comma-separated
+                    return [i.strip() for i in backend_cors.split(",")]
+                elif isinstance(backend_cors, list):
+                    return backend_cors
         return v
     
     # Caching
