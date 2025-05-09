@@ -18,11 +18,15 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # CORS
-    CORS_ORIGINS: List[str] = []
+    # CORS - Adding default value for production failsafe
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://movielens-recommender-frontend.onrender.com", "https://movielens-recommender-frontend-3.vercel.app"]
     
     @field_validator("CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        # If empty value, return default CORS
+        if not v:
+            return ["http://localhost:3000", "https://movielens-recommender-frontend.onrender.com"]
+            
         # Try to parse as JSON first
         if isinstance(v, str):
             try:
@@ -39,14 +43,16 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, list):
             return v
-        raise ValueError(f"Invalid CORS_ORIGINS value: {v}")
+        # Failsafe return if all parsing fails
+        return ["http://localhost:3000", "https://movielens-recommender-frontend.onrender.com"]
     
     # Backwards compatibility for BACKEND_CORS_ORIGINS
     BACKEND_CORS_ORIGINS: Optional[str] = None
     
     @field_validator("CORS_ORIGINS", mode="after")
     def use_legacy_cors_if_present(cls, v, info: ValidationInfo):
-        if not v:
+        # If CORS_ORIGINS is empty but we have BACKEND_CORS_ORIGINS
+        if not v or len(v) == 0:
             backend_cors = info.data.get("BACKEND_CORS_ORIGINS")
             if backend_cors:
                 # Process backend_cors if it's not empty
@@ -65,6 +71,11 @@ class Settings(BaseSettings):
                     return [i.strip() for i in backend_cors.split(",")]
                 elif isinstance(backend_cors, list):
                     return backend_cors
+                    
+        # Extra failsafe: if we somehow still have an empty list, provide defaults
+        if not v or len(v) == 0:
+            return ["http://localhost:3000", "https://movielens-recommender-frontend.onrender.com"]
+            
         return v
     
     # Caching
