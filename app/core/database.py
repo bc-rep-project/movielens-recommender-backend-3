@@ -3,8 +3,6 @@ import redis
 from loguru import logger
 from .config import settings
 import os
-import asyncio
-import time
 
 
 # MongoDB
@@ -12,35 +10,14 @@ mongodb_client: AsyncIOMotorClient = None
 
 
 async def connect_to_mongodb():
-    """Connect to MongoDB Atlas with retries"""
+    """Connect to MongoDB Atlas"""
     global mongodb_client
-    max_retries = 5
-    retry_delay = 1  # seconds
-
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Connecting to MongoDB (attempt {attempt+1}/{max_retries})...")
-            mongodb_client = AsyncIOMotorClient(
-                settings.MONGODB_URI,
-                serverSelectionTimeoutMS=5000,  # Shorter timeout for faster retry
-                connectTimeoutMS=5000,
-                retryWrites=True
-            )
-            
-            # Verify the connection with a ping
-            await mongodb_client.admin.command('ping')
-            
-            logger.info("Successfully connected to MongoDB Atlas")
-            return
-        except Exception as e:
-            if attempt < max_retries - 1:
-                logger.warning(f"MongoDB connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay}s...")
-                await asyncio.sleep(retry_delay)
-                # Increase delay for next retry (exponential backoff)
-                retry_delay = min(retry_delay * 2, 30)  # Cap at 30 seconds
-            else:
-                logger.error(f"Failed to connect to MongoDB after {max_retries} attempts: {e}")
-                raise
+    try:
+        mongodb_client = AsyncIOMotorClient(settings.MONGODB_URI)
+        logger.info("Connected to MongoDB Atlas")
+    except Exception as e:
+        logger.error(f"Failed to connect to MongoDB: {e}")
+        raise
 
 
 async def close_mongodb_connection():
@@ -66,7 +43,7 @@ _redis_connection_attempted = False  # Flag to track if we've already tried to c
 
 
 async def init_redis():
-    """Initialize Redis connection with retries."""
+    """Initialize Redis connection."""
     global _redis_client, _redis_connection_attempted
     
     # Don't attempt connection more than once
@@ -74,16 +51,17 @@ async def init_redis():
         return
     
     _redis_connection_attempted = True
-    max_retries = 3
-    retry_delay = 1  # seconds
     
-    for attempt in range(max_retries):
+    # Maximum connection attempts
+    max_attempts = 3
+    
+    for attempt in range(1, max_attempts + 1):
         try:
             # For development or testing, use a local Redis if available
             if settings.ENV in ("development", "testing"):
                 try:
+                    logger.info(f"Attempting local Redis connection (attempt {attempt}/{max_attempts})...")
                     # Try to connect to local Redis first
-                    logger.info(f"Attempting local Redis connection (attempt {attempt+1}/{max_retries})...")
                     test_client = redis.Redis(
                         host="localhost",
                         port=6379,
@@ -99,10 +77,25 @@ async def init_redis():
                 except Exception as local_error:
                     logger.warning(f"Could not connect to local Redis: {local_error}, will try configured Redis")
             
-            # If individual Redis settings are provided, use those
-            if settings.REDIS_HOST:
+            # If REDIS_HOST starts with redis://, parse it as a URL
+            if settings.REDIS_HOST and settings.REDIS_HOST.startswith("redis://"):
                 try:
-                    logger.info(f"Connecting to Redis with host/port settings (attempt {attempt+1}/{max_retries})...")
+                    logger.info(f"Connecting to Redis with URL (attempt {attempt}/{max_attempts})...")
+                    _redis_client = redis.from_url(
+                        settings.REDIS_HOST,
+                        decode_responses=False,
+                        socket_connect_timeout=5.0  # Timeout after 5 seconds
+                    )
+                    _redis_client.ping()  # Test connection
+                    logger.info("Connected to Redis via URL")
+                    return
+                except Exception as redis_url_error:
+                    logger.warning(f"Failed to connect to Redis with URL: {redis_url_error}")
+                    _redis_client = None
+            # If individual Redis settings are provided, use those
+            elif settings.REDIS_HOST:
+                try:
+                    logger.info(f"Connecting to Redis with host/port settings (attempt {attempt}/{max_attempts})...")
                     _redis_client = redis.Redis(
                         host=settings.REDIS_HOST,
                         port=settings.REDIS_PORT or 6379,
@@ -121,7 +114,7 @@ async def init_redis():
             # Otherwise, try to use REDIS_URL if available
             elif os.getenv("REDIS_URL"):
                 try:
-                    logger.info(f"Connecting to Redis via URL (attempt {attempt+1}/{max_retries})...")
+                    logger.info(f"Connecting to Redis via REDIS_URL environment variable (attempt {attempt}/{max_attempts})...")
                     _redis_client = redis.from_url(
                         os.getenv("REDIS_URL"),
                         decode_responses=False,
@@ -139,16 +132,11 @@ async def init_redis():
                 return
                 
         except Exception as e:
-            if attempt < max_retries - 1:
-                logger.warning(f"Redis connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay}s...")
-                await asyncio.sleep(retry_delay)
-                # Increase delay for next retry
-                retry_delay = min(retry_delay * 2, 10)  # Cap at 10 seconds
-            else:
-                logger.error(f"Failed to connect to Redis after {max_retries} attempts: {e}")
-                _redis_client = None
-                logger.warning("Redis will be disabled for this session")
-                return
+            logger.error(f"Failed to connect to Redis: {e}")
+            
+    # If we get here, all attempts failed
+    logger.warning("All Redis connection attempts failed, caching will be disabled")
+    _redis_client = None
 
 
 def get_redis():

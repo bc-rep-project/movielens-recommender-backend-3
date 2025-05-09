@@ -2,90 +2,63 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...core.database import get_database, get_redis
 from motor.motor_asyncio import AsyncIOMotorClient
 import redis
-from ...core.config import settings
+from typing import Dict, Any
 import time
-import sys
 import platform
 import os
-from loguru import logger
-from typing import Dict, Any
+from ...core.config import settings
+
 
 router = APIRouter()
 
-async def check_mongo_connection() -> Dict[str, Any]:
-    """Check MongoDB connection status"""
-    try:
-        db = get_database()
-        # Try a simple command to verify connection
-        start_time = time.time()
-        await db.command("ping")
-        response_time = (time.time() - start_time) * 1000  # Convert to ms
-        return {
-            "status": "ok",
-            "response_time_ms": round(response_time, 2)
-        }
-    except Exception as e:
-        logger.error(f"MongoDB health check failed: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-def check_redis_connection() -> Dict[str, Any]:
-    """Check Redis connection status"""
-    try:
-        redis_client = get_redis()
-        if not redis_client:
-            return {"status": "disabled"}
-        
-        # Try a simple command to verify connection
-        start_time = time.time()
-        redis_client.ping()
-        response_time = (time.time() - start_time) * 1000  # Convert to ms
-        return {
-            "status": "ok",
-            "response_time_ms": round(response_time, 2)
-        }
-    except Exception as e:
-        logger.error(f"Redis health check failed: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
 
 @router.get("")
-async def health_check():
+async def health_check() -> Dict[str, Any]:
     """
-    Health check endpoint to verify API and dependencies status
+    Health check endpoint to verify API and dependencies are working.
+    Returns status of database connections and basic system info.
     """
     start_time = time.time()
-    
-    # Check MongoDB
-    mongo_status = await check_mongo_connection()
-    
-    # Check Redis
-    redis_status = check_redis_connection()
-    
-    # Get system information
-    system_info = {
-        "python_version": platform.python_version(),
-        "platform": f"{platform.system()} {platform.release()}",
-        "environment": os.environ.get("ENV", "development"),
-        "cloud_run": os.environ.get("CLOUD_RUN", "false")
+    health_data = {
+        "status": "ok",
+        "version": "1.0.0",
+        "timestamp": time.time(),
+        "environment": settings.ENV,
+        "dependencies": {
+            "mongodb": {"status": "unknown"},
+            "redis": {"status": "unknown"}
+        },
+        "system": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform()
+        }
     }
     
-    # Calculate total response time
-    response_time = (time.time() - start_time) * 1000  # Convert to ms
+    # Check MongoDB connection
+    try:
+        db = get_database()
+        # Perform a simple operation to verify connection
+        await db.command("ping")
+        health_data["dependencies"]["mongodb"]["status"] = "ok"
+    except Exception as e:
+        health_data["dependencies"]["mongodb"]["status"] = "error"
+        health_data["dependencies"]["mongodb"]["error"] = str(e)
+        health_data["status"] = "degraded"  # MongoDB is critical, mark as degraded
     
-    return {
-        "status": "ok" if mongo_status["status"] == "ok" else "degraded",
-        "version": settings.API_VERSION,
-        "timestamp": time.time(),
-        "environment": system_info["environment"],
-        "dependencies": {
-            "mongodb": mongo_status,
-            "redis": redis_status
-        },
-        "system": system_info,
-        "response_time_ms": round(response_time, 2)
-    } 
+    # Check Redis connection
+    redis_client = get_redis()
+    if redis_client:
+        try:
+            redis_client.ping()
+            health_data["dependencies"]["redis"]["status"] = "ok"
+        except Exception as e:
+            health_data["dependencies"]["redis"]["status"] = "error"
+            health_data["dependencies"]["redis"]["error"] = str(e)
+            # Redis is not critical, app can work without it (just slower)
+    else:
+        health_data["dependencies"]["redis"]["status"] = "disabled"
+    
+    # Calculate response time
+    health_data["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
+    
+    return health_data 
