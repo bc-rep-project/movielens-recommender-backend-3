@@ -176,6 +176,11 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     
+    # TMDB API Configuration - Add these fields to fix the validation errors
+    TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", "")
+    TMDB_BASE_URL: str = os.getenv("TMDB_BASE_URL", "https://api.themoviedb.org/3")
+    TMDB_IMAGE_BASE_URL: str = os.getenv("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p/w500")
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": True
