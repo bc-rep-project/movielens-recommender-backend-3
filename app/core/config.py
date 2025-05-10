@@ -181,6 +181,9 @@ class Settings(BaseSettings):
     TMDB_BASE_URL: str = os.getenv("TMDB_BASE_URL", "https://api.themoviedb.org/3")
     TMDB_IMAGE_BASE_URL: str = os.getenv("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p/w500")
     
+    # Data directories
+    LOCAL_DATA_DIR: str = os.getenv("LOCAL_DATA_DIR", "./data")
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": True
