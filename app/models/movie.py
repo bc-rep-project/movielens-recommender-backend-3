@@ -31,6 +31,9 @@ class MovieBase(BaseModel):
     title: str = Field(..., description="The title of the movie")
     genres: List[str] = Field(..., description="List of genres the movie belongs to")
     year: Optional[int] = Field(None, description="Year the movie was released")
+    poster_path: Optional[str] = Field(None, description="Relative path to movie poster image")
+    backdrop_path: Optional[str] = Field(None, description="Relative path to movie backdrop image")
+    tmdb_id: Optional[int] = Field(None, description="The Movie Database ID for the movie")
     
     class Config:
         arbitrary_types_allowed = True
@@ -68,6 +71,8 @@ class MovieInDB(MovieBase):
 class MovieResponse(MovieBase):
     """Movie model returned in API responses"""
     id: str = Field(..., description="Unique identifier for the movie")
+    poster_url: Optional[str] = Field(None, description="Full URL to movie poster image")
+    backdrop_url: Optional[str] = Field(None, description="Full URL to movie backdrop image")
     
     class Config:
         json_schema_extra = {
@@ -75,7 +80,10 @@ class MovieResponse(MovieBase):
                 "id": "507f1f77bcf86cd799439011",
                 "title": "The Shawshank Redemption",
                 "genres": ["Drama"],
-                "year": 1994
+                "year": 1994,
+                "poster_path": "/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+                "poster_url": "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+                "tmdb_id": 278
             }
         }
 

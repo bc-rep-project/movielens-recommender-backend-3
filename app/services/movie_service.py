@@ -9,6 +9,7 @@ from ..core.config import settings
 import json
 from ..data_access.mongo_client import MovieRepository
 from ..data_access.redis_client import CacheRepository
+import os
 
 
 class MovieNotFoundError(Exception):
@@ -20,6 +21,19 @@ class MovieService:
     def __init__(self):
         self.movie_repo = MovieRepository()
         self.cache_repo = CacheRepository()
+        self.image_base_url = os.getenv("TMDB_IMAGE_BASE_URL", "https://image.tmdb.org/t/p/w500")
+    
+    def _get_full_poster_url(self, poster_path: Optional[str]) -> Optional[str]:
+        """Create a full poster URL from a relative path"""
+        if not poster_path:
+            return None
+        return f"{self.image_base_url}{poster_path}"
+    
+    def _get_full_backdrop_url(self, backdrop_path: Optional[str]) -> Optional[str]:
+        """Create a full backdrop URL from a relative path"""
+        if not backdrop_path:
+            return None
+        return f"{self.image_base_url}{backdrop_path}".replace("w500", "original")
     
     async def get_movies(self, skip: int = 0, limit: int = 20) -> List[MovieResponse]:
         """
@@ -58,7 +72,12 @@ class MovieService:
                         "id": str(movie["_id"]),  # Map _id to id
                         "title": movie["title"],
                         "genres": movie["genres"],
-                        "year": movie.get("year")
+                        "year": movie.get("year"),
+                        "poster_path": movie.get("poster_path"),
+                        "backdrop_path": movie.get("backdrop_path"),
+                        "tmdb_id": movie.get("tmdb_id"),
+                        "poster_url": self._get_full_poster_url(movie.get("poster_path")),
+                        "backdrop_url": self._get_full_backdrop_url(movie.get("backdrop_path"))
                     }
                     print(f"Creating MovieResponse for movie: {movie['title']} with id: {movie_dict['id']}")
                     movie_response = MovieResponse(**movie_dict)
@@ -112,7 +131,12 @@ class MovieService:
                 "id": str(movie["_id"]),  # Map _id to id
                 "title": movie["title"],
                 "genres": movie["genres"],
-                "year": movie.get("year")
+                "year": movie.get("year"),
+                "poster_path": movie.get("poster_path"),
+                "backdrop_path": movie.get("backdrop_path"),
+                "tmdb_id": movie.get("tmdb_id"),
+                "poster_url": self._get_full_poster_url(movie.get("poster_path")),
+                "backdrop_url": self._get_full_backdrop_url(movie.get("backdrop_path"))
             }
             
             movie_response = MovieResponse(**movie_dict)
@@ -161,7 +185,12 @@ class MovieService:
                         "id": str(movie["_id"]),  # Map _id to id
                         "title": movie["title"],
                         "genres": movie["genres"],
-                        "year": movie.get("year")
+                        "year": movie.get("year"),
+                        "poster_path": movie.get("poster_path"),
+                        "backdrop_path": movie.get("backdrop_path"),
+                        "tmdb_id": movie.get("tmdb_id"),
+                        "poster_url": self._get_full_poster_url(movie.get("poster_path")),
+                        "backdrop_url": self._get_full_backdrop_url(movie.get("backdrop_path"))
                     }
                     movie_response = MovieResponse(**movie_dict)
                     movies.append(movie_response)
