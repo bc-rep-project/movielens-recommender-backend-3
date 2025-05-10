@@ -51,11 +51,15 @@ async def get_item_recommendations(
                 movieId=movie_id,
                 similar_items=[]
             )
+                        
+        # RecommendationResponse objects are already in the correct format for Recommendation in ItemRecommendationResponse
+        # They both have 'movie' and 'score' fields
         return ItemRecommendationResponse(
             movieId=movie_id,
             similar_items=similar_movies
         )
     except Exception as e:
+        logger.error(f"Error getting similar movies: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting similar movies: {str(e)}")
 
 
