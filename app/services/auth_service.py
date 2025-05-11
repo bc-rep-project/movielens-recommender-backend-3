@@ -220,4 +220,68 @@ async def verify_token(token: str) -> Tuple[bool, Dict[str, Any]]:
             
     except Exception as e:
         logger.error(f"Unexpected error verifying token: {str(e)}")
-        return False, {"error": f"Authentication error: {str(e)}"} 
+        return False, {"error": f"Authentication error: {str(e)}"}
+
+
+async def get_user_details(user_id: str) -> Dict[str, Any]:
+    """
+    Get detailed user information from Supabase using the user ID
+    
+    Args:
+        user_id: The Supabase user ID
+        
+    Returns:
+        Dictionary containing user details
+    """
+    try:
+        if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+            logger.error("Supabase URL or service role key not configured")
+            return {"error": "User service not properly configured"}
+        
+        logger.info(f"Fetching user details for ID: {user_id}")
+        
+        # For testing when Supabase connection fails
+        if settings.ENV == "development" or settings.ENV == "test":
+            # Create a mock successful response
+            logger.info(f"Development mode: Returning mock user details for {user_id}")
+            return {
+                "id": user_id,
+                "full_name": "Test User",
+                "avatar_url": None,
+                "preferences": {"theme": "dark"},
+                "created_at": datetime.utcnow().isoformat()
+            }
+        
+        # Make request to Supabase Auth API with service role key
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+                headers={
+                    "apikey": settings.SUPABASE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}"
+                }
+            )
+            
+        if response.status_code == 200:
+            user_data = response.json()
+            logger.info(f"Successfully retrieved user details for {user_id}")
+            
+            # Extract relevant fields
+            result = {
+                "id": user_data.get("id"),
+                "email": user_data.get("email"),
+                "full_name": user_data.get("user_metadata", {}).get("full_name"),
+                "avatar_url": user_data.get("user_metadata", {}).get("avatar_url"),
+                "last_sign_in_at": user_data.get("last_sign_in_at"),
+                "created_at": user_data.get("created_at")
+            }
+            
+            return result
+        else:
+            error_data = response.json()
+            logger.error(f"Failed to retrieve user details: {error_data}")
+            return {"error": error_data.get("message", "User not found")}
+                
+    except Exception as e:
+        logger.error(f"Error fetching user details: {str(e)}")
+        return {"error": f"Failed to retrieve user information: {str(e)}"} 

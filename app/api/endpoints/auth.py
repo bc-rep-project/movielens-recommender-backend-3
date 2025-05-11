@@ -3,6 +3,8 @@ from typing import Dict, Any
 from ...models.auth import UserCreate, UserLogin, AuthResponse, RegisterResponse
 from ...services import auth_service, pipeline_trigger_service
 from loguru import logger
+from app.core.auth import get_current_user
+from app.services.auth_service import get_user_details
 
 router = APIRouter()
 
@@ -78,4 +80,47 @@ async def login(user: UserLogin):
     return AuthResponse(
         session=session,
         user=user_info
-    ) 
+    )
+
+@router.get("/verify", response_model=Dict[str, Any])
+async def verify_auth(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Verify if the current authentication token is valid.
+    Returns user information if authenticated.
+    """
+    try:
+        # The fact that we reached this point means the token is valid
+        # We can return basic user info
+        return {
+            "isAuthenticated": True,
+            "user": {
+                "id": current_user.get("user_id"),
+                "email": current_user.get("email")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verifying authentication: {str(e)}"
+        )
+
+@router.get("/me", response_model=Dict[str, Any])
+async def get_current_user_info(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Get detailed information about the current authenticated user.
+    """
+    try:
+        # Get additional user details from the database if needed
+        user_details = await get_user_details(current_user["user_id"])
+        
+        # Merge with token info and return
+        return {
+            "id": current_user["user_id"],
+            "email": current_user.get("email", ""),
+            **user_details
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user details: {str(e)}"
+        ) 
