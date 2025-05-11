@@ -12,11 +12,8 @@ from ..data_access.redis_client import CacheRepository
 from ..models.movie import MovieResponse
 from ..models.recommendation import RecommendationResponse
 from scipy.spatial.distance import cosine
+from ..core.exceptions import RecommendationServiceError
 
-
-class RecommendationServiceError(Exception):
-    """Exception raised for errors in recommendation service"""
-    pass
 
 class RecommendationService:
     def __init__(self):

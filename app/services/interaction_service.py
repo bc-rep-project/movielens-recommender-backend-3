@@ -7,10 +7,7 @@ from datetime import datetime
 import json
 from ..data_access.mongo_client import InteractionRepository
 from ..data_access.redis_client import CacheRepository
-
-class InteractionServiceError(Exception):
-    """Base exception for interaction service errors"""
-    pass
+from ..core.exceptions import InteractionServiceError
 
 class InteractionService:
     def __init__(self):

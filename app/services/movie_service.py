@@ -9,12 +9,8 @@ from ..core.config import settings
 import json
 from ..data_access.mongo_client import MovieRepository
 from ..data_access.redis_client import CacheRepository
+from ..core.exceptions import MovieNotFoundError
 import os
-
-
-class MovieNotFoundError(Exception):
-    """Exception raised when a movie is not found"""
-    pass
 
 
 class MovieService:
@@ -195,12 +191,7 @@ class MovieService:
                         "id": str(movie["_id"]),  # Map _id to id
                         "title": movie["title"],
                         "genres": movie["genres"],
-                        "year": movie.get("year"),
-                        "poster_path": movie.get("poster_path"),
-                        "backdrop_path": movie.get("backdrop_path"),
-                        "tmdb_id": movie.get("tmdb_id"),
-                        "poster_url": self._get_full_poster_url(movie.get("poster_path")),
-                        "backdrop_url": self._get_full_backdrop_url(movie.get("backdrop_path"))
+                        "year": movie.get("year")
                     }
                     movie_response = MovieResponse(**movie_dict)
                     movies.append(movie_response)

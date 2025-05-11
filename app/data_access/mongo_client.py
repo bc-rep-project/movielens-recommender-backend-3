@@ -3,6 +3,7 @@ from bson import ObjectId
 from typing import List, Dict, Any, Optional
 from ..core.database import get_database
 from loguru import logger
+from ..core.exceptions import MovieNotFoundError
 
 class BaseRepository:
     """Base repository class for MongoDB collections"""
@@ -30,10 +31,11 @@ class MovieRepository(BaseRepository):
             movie_id: MongoDB ObjectId as string
             
         Returns:
-            Movie document if found, None otherwise
+            Movie document if found
             
         Raises:
             ValueError: If movie_id is not a valid ObjectId
+            MovieNotFoundError: If the movie with the given ID doesn't exist
         """
         try:
             # Validate movie_id format before query
@@ -41,7 +43,15 @@ class MovieRepository(BaseRepository):
                 raise ValueError(f"Invalid ObjectId format: {movie_id}")
                 
             collection = await self.get_collection()
-            return await collection.find_one({"_id": ObjectId(movie_id)})
+            movie = await collection.find_one({"_id": ObjectId(movie_id)})
+            
+            if not movie:
+                raise MovieNotFoundError(f"Movie with ID {movie_id} not found")
+                
+            return movie
+        except MovieNotFoundError:
+            # Re-raise MovieNotFoundError
+            raise
         except Exception as e:
             # Log the error but don't mask the original exception
             logger.error(f"Error in MovieRepository.get_by_id: {e}")

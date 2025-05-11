@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Path
 from typing import List, Dict, Any, Optional
-from ...services.movie_service import movie_service, MovieNotFoundError
+from ...services.movie_service import movie_service
 from ...models.movie import MovieResponse
 from ..deps import get_optional_user_id
+from ...core.exceptions import MovieNotFoundError
 import json
 
 router = APIRouter()
