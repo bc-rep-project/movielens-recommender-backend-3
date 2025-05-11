@@ -111,6 +111,10 @@ class MovieService:
             
         Returns:
             Movie object if found, None otherwise
+            
+        Raises:
+            MovieNotFoundError: When the movie is not found
+            ValueError: When the movie_id format is invalid
         """
         try:
             # Try to get from cache first
@@ -124,7 +128,7 @@ class MovieService:
             movie = await self.movie_repo.get_by_id(movie_id)
             
             if not movie:
-                return None
+                raise MovieNotFoundError(f"Movie with ID {movie_id} not found")
             
             # Properly map _id to id for MovieResponse   
             movie_dict = {
@@ -150,8 +154,14 @@ class MovieService:
             
             return movie_response
         
+        except MovieNotFoundError:
+            # Re-raise MovieNotFoundError
+            raise
         except Exception as e:
             logger.error(f"Error getting movie by ID: {str(e)}")
+            # Properly propagate value errors related to ObjectId parsing
+            if "ObjectId" in str(e) and "not valid" in str(e):
+                raise ValueError(f"Invalid movie ID format: {str(e)}")
             return None
 
     async def search_movies(self, query: str, skip: int = 0, limit: int = 20) -> List[MovieResponse]:

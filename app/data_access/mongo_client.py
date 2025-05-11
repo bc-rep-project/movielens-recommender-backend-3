@@ -23,13 +23,29 @@ class MovieRepository(BaseRepository):
         super().__init__("movies")
     
     async def get_by_id(self, movie_id: str) -> Optional[Dict[str, Any]]:
-        """Get a movie by ID"""
+        """
+        Get a movie by ID
+        
+        Args:
+            movie_id: MongoDB ObjectId as string
+            
+        Returns:
+            Movie document if found, None otherwise
+            
+        Raises:
+            ValueError: If movie_id is not a valid ObjectId
+        """
         try:
+            # Validate movie_id format before query
+            if not ObjectId.is_valid(movie_id):
+                raise ValueError(f"Invalid ObjectId format: {movie_id}")
+                
             collection = await self.get_collection()
             return await collection.find_one({"_id": ObjectId(movie_id)})
         except Exception as e:
+            # Log the error but don't mask the original exception
             logger.error(f"Error in MovieRepository.get_by_id: {e}")
-            return None
+            raise
     
     async def get_movies(self, skip: int = 0, limit: int = 20) -> List[Dict[str, Any]]:
         """Get a paginated list of movies"""

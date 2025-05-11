@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Path
 from typing import List, Dict, Any, Optional
-from ...services.movie_service import movie_service
+from ...services.movie_service import movie_service, MovieNotFoundError
 from ...models.movie import MovieResponse
 from ..deps import get_optional_user_id
 import json
@@ -46,7 +46,7 @@ async def search_movies(
         return []
 
 
-@router.get("/{movie_id}")
+@router.get("/{movie_id}", response_model=MovieResponse)
 async def get_movie(
     movie_id: str = Path(..., description="The ID of the movie to get")
 ):
@@ -58,7 +58,13 @@ async def get_movie(
         if not movie:
             raise HTTPException(status_code=404, detail="Movie not found")
         return movie
-    except HTTPException as e:
-        raise e
+    except MovieNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        # Handle invalid ObjectId format
+        raise HTTPException(status_code=400, detail=f"Invalid movie ID format: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving movie: {str(e)}") 
