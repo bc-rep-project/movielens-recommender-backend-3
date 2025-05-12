@@ -364,16 +364,21 @@ class RecommendationService:
                     movies_data = await cursor.to_list(length=limit)
                     
                     if movies_data:
-                        # Convert to MovieResponse objects
+                        # Convert to MovieResponse objects with CONSISTENT ID FORMAT
                         movies = []
                         for movie in movies_data:
                             try:
-                                # Properly map _id to id for MovieResponse
+                                # Use the same movie_dict structure as in movie_service
                                 movie_dict = {
-                                    "id": str(movie["_id"]),
+                                    "id": str(movie["_id"]),  # Always use MongoDB ObjectId as the standard
                                     "title": movie["title"],
                                     "genres": movie["genres"],
-                                    "year": movie.get("year")
+                                    "year": movie.get("year"),
+                                    "poster_path": movie.get("poster_path"),
+                                    "backdrop_path": movie.get("backdrop_path"),
+                                    "tmdb_id": movie.get("tmdb_id"),
+                                    "poster_url": self._get_full_poster_url(movie.get("poster_path")),
+                                    "backdrop_url": self._get_full_backdrop_url(movie.get("backdrop_path"))
                                 }
                                 movie_response = MovieResponse(**movie_dict)
                                 movies.append(movie_response)
@@ -404,6 +409,19 @@ class RecommendationService:
             logger.error(f"Error getting popular movies: {str(e)}")
             # Return empty list on error
             return []
+
+    # Add helper method for poster URL construction (same as in MovieService)
+    def _get_full_poster_url(self, poster_path: Optional[str]) -> Optional[str]:
+        """Create a full poster URL from a relative path"""
+        if not poster_path:
+            return None
+        return f"{settings.TMDB_IMAGE_BASE_URL}{poster_path}"
+
+    def _get_full_backdrop_url(self, backdrop_path: Optional[str]) -> Optional[str]:
+        """Create a full backdrop URL from a relative path"""
+        if not backdrop_path:
+            return None
+        return f"{settings.TMDB_IMAGE_BASE_URL.replace('w500', 'original')}{backdrop_path}"
 
 # Create a singleton instance
 recommendation_service = RecommendationService()

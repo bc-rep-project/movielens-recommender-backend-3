@@ -63,9 +63,10 @@ class MovieService:
             movies = []
             for movie in movies_data:
                 try:
-                    # Properly map _id to id for MovieResponse
+                    # Ensure the movie has complete data including poster, backdrop, etc.
+                    # This ensures consistent data format across all endpoints
                     movie_dict = {
-                        "id": str(movie["_id"]),  # Map _id to id
+                        "id": str(movie["_id"]),  # Always use MongoDB ObjectId as the standard
                         "title": movie["title"],
                         "genres": movie["genres"],
                         "year": movie.get("year"),
