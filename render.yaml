@@ -1,0 +1,136 @@
+services:
+  # Backend API service
+  - type: web
+    name: movielens-recommender-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host=0.0.0.0 --port=$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: http://localhost:3000,https://localhost:3000,https://movielens-recommender-frontend.onrender.com
+      - key: MODEL_STORAGE_PATH
+        value: /app/models
+      - key: MODEL_VERSION
+        value: v1.0
+      - key: RECOMMENDATION_CACHE_TTL
+        value: 3600
+      - key: POPULAR_ITEMS_CACHE_TTL
+        value: 86400
+      - key: REDIS_URL
+        fromDatabase:
+          name: redis-instance
+          property: connectionString
+      - key: MONGODB_URI
+        sync: false  # This will be set manually
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: models
+      mountPath: /app/models
+      sizeGB: 2
+
+  # Data Pipeline Worker (on-demand)
+  - type: worker
+    name: movielens-data-pipeline
+    env: python
+    buildCommand: pip install -r data_pipeline/requirements.txt
+    startCommand: cd data_pipeline && python run_pipeline.py --skip-download --skip-process
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENV
+        value: production
+      - key: MODEL_STORAGE_PATH
+        value: /app/models
+      - key: MODEL_VERSION
+        value: v1.0
+      - key: MONGODB_URI
+        sync: false  # This will be set manually
+    disk:
+      name: pipeline-data
+      mountPath: /app/data
+      sizeGB: 2
+      
+  # Data Pipeline Scheduled Job (runs automatically on a schedule)
+  - type: cron
+    name: movielens-data-pipeline-scheduled
+    env: python
+    buildCommand: pip install -r data_pipeline/requirements.txt
+    schedule: "0 0 * * *"  # Run daily at midnight
+    command: cd data_pipeline && python run_pipeline.py --pipeline-mode=incremental
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENV
+        value: production
+      - key: MODEL_STORAGE_PATH
+        value: /app/models
+      - key: MODEL_VERSION
+        value: v1.0
+      - key: MONGODB_URI
+        sync: false  # This will be set manually
+      - key: PIPELINE_MODE
+        value: "incremental"  # Default to incremental updates
+      - key: MIN_INTERACTIONS_THRESHOLD
+        value: "50"  # Only retrain if we have at least 50 new interactions
+      - key: RETRAIN_INTERVAL_DAYS
+        value: "7"  # Force full retraining every 7 days
+      - key: HF_MODEL_NAME
+        value: "sentence-transformers/all-MiniLM-L6-v2"  # Specify the Hugging Face model
+    disk:
+      name: pipeline-data-scheduled
+      mountPath: /app/data
+      sizeGB: 2
+      
+  # Weekly Full Retraining Job (runs once a week for complete model refresh)
+  - type: cron
+    name: movielens-full-retraining
+    env: python
+    buildCommand: pip install -r data_pipeline/requirements.txt
+    schedule: "0 0 * * 0"  # Run at midnight on Sundays
+    command: cd data_pipeline && python run_pipeline.py --pipeline-mode=full
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENV
+        value: production
+      - key: MODEL_STORAGE_PATH
+        value: /app/models
+      - key: MODEL_VERSION
+        value: v1.0
+      - key: MONGODB_URI
+        sync: false  # This will be set manually
+      - key: PIPELINE_MODE
+        value: "full"  # Run full pipeline including model training
+      - key: HF_MODEL_NAME
+        value: "sentence-transformers/all-MiniLM-L6-v2"  # Specify the Hugging Face model
+    disk:
+      name: pipeline-data-full
+      mountPath: /app/data
+      sizeGB: 2
+
+  # # Frontend Next.js application
+  # - type: web
+  #   name: movielens-recommender-frontend
+  #   env: node
+  #   buildCommand: cd frontend && npm install && npm run build
+  #   startCommand: cd frontend && npm start
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: 18.15.0
+  #     - key: NEXT_PUBLIC_API_URL
+  #       value: https://movielens-recommender-api.onrender.com
+  #     - key: NEXT_PUBLIC_SUPABASE_URL
+  #       value: https://xpfoymxerafywnlfrvgb.supabase.co
+  #     - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+  #       value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZm95bXhlcmFmeXdubGZydmdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM2Njg2NDAsImV4cCI6MjA0OTI0NDY0MH0.RaNBtjLnCaU5dHTTDJ_rxpw9a8RirAxModLIG-e2xfo
+  #   autoDeploy: true
+
+databases:
+  - name: redis-instance
+    databaseName: recommender-cache
+    ipAllowList: [] # allow all IPs 
