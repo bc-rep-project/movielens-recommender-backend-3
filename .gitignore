@@ -54,6 +54,7 @@ tmp/
 
 # Documentation
 docs/_build/
+DEVELOPMENT.md
 
 # Data
 data/

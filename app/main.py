@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from .api.api import api_router
 from .core.config import settings
 from .core.database import connect_to_mongodb, close_mongodb_connection, init_redis
+from .core.init_db import ensure_movies_exist
 import uvicorn
 
 # Define lifespan for startup/shutdown events
@@ -16,7 +17,17 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up MovieLens Recommender API")
     await connect_to_mongodb()
     await init_redis()
+    
+    # Initialize database if needed
+    logger.info("Checking if movie data exists in database")
+    data_loaded = await ensure_movies_exist()
+    if data_loaded:
+        logger.info("Sample movie data has been loaded")
+    else:
+        logger.info("Using existing movie data")
+    
     yield
+    
     # Shutdown: Close connections, etc.
     logger.info("Shutting down MovieLens Recommender API")
     await close_mongodb_connection()
