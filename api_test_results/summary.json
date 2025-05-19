@@ -1,0 +1,41 @@
+{
+  "test_date": "2025-05-18T16:50:03Z",
+  "api_url": "http://localhost:8000/api",
+  "endpoints_tested": [
+    {"endpoint":"/auth/login/invalid","success":true}
+,
+    {"endpoint":"/health","success":true}
+,
+    {"endpoint":"/interactions","success":true}
+,
+    {"endpoint":"/interactions/me","success":true}
+,
+    {"endpoint":"/interactions/me?type=rating","success":true}
+,
+    {"endpoint":"/interactions/me?type=view","success":true}
+,
+    {"endpoint":"/movies/681fd222aef6bdf4e4c4d51f","success":true}
+,
+    {"endpoint":"/movies?limit=10&page=2","success":true}
+,
+    {"endpoint":"/movies?limit=5","success":true}
+,
+    {"endpoint":"/movies/search?query=action&limit=5","success":true}
+,
+    {"endpoint":"/movies/search?query=toy%20story&limit=5","success":true}
+,
+    {"endpoint":"/recommendations/item/681fd222aef6bdf4e4c4d51f","success":true}
+,
+    {"endpoint":"/recommendations/item/","success":true}
+,
+    {"endpoint":"/recommendations/popular?limit=5","success":true}
+,
+    {"endpoint":"/recommendations/user/collaborative?limit=5","success":true}
+,
+    {"endpoint":"/recommendations/user/content-based?limit=5","success":true}
+,
+    {"endpoint":"/recommendations/user/hybrid?limit=5","success":true}
+,
+    {"endpoint":"/recommendations/user?limit=5","success":true}
+  ]
+}

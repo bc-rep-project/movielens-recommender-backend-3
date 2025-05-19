@@ -1,0 +1,21 @@
+{
+  "status": "degraded",
+  "version": "1.0.0",
+  "timestamp": 1747586995.6219342,
+  "environment": "development",
+  "dependencies": {
+    "mongodb": {
+      "status": "error",
+      "error": "cluster0-shard-00-02.bh0nl.mongodb.net:27017: [Errno -3] Temporary failure in name resolution (configured timeouts: connectTimeoutMS: 20000.0ms)"
+    },
+    "redis": {
+      "status": "error",
+      "error": "Error -3 connecting to redis-13150.c341.af-south-1-1.ec2.redns.redis-cloud.com:13150. Temporary failure in name resolution."
+    }
+  },
+  "system": {
+    "python_version": "3.12.7",
+    "platform": "Linux-6.11.0-25-generic-x86_64-with-glibc2.40"
+  },
+  "response_time_ms": 194.17
+}

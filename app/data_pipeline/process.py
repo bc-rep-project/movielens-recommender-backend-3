@@ -25,6 +25,7 @@ import httpx
 import asyncio
 import time
 from tqdm.asyncio import tqdm as async_tqdm
+import requests
 
 
 # Load environment variables
@@ -67,6 +68,41 @@ def download_from_gcs(bucket_name, source_blob_name):
         return content
     except Exception as e:
         logger.error(f"Error downloading from GCS: {e}")
+        return None
+
+
+def download_from_movielens():
+    """
+    Download the MovieLens dataset directly from their website
+    
+    Returns:
+        bytes: The dataset content
+    """
+    url = "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip"
+    logger.info(f"Downloading MovieLens dataset directly from {url}")
+    
+    try:
+        # Create local directory if it doesn't exist
+        local_dir = Path(LOCAL_DATA_DIR)
+        local_dir.mkdir(exist_ok=True)
+        
+        dataset_dir = local_dir / DATASET_PATH
+        dataset_dir.mkdir(exist_ok=True, parents=True)
+        
+        local_path = dataset_dir / "ml-latest-small.zip"
+        
+        # Download the file
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # Save locally for future use
+        with open(local_path, "wb") as f:
+            f.write(response.content)
+            
+        logger.info(f"Downloaded dataset to {local_path}")
+        return response.content
+    except Exception as e:
+        logger.error(f"Error downloading from MovieLens: {e}")
         return None
 
 
@@ -484,27 +520,50 @@ def process_movielens_data():
         setup_logging()
         
         # Extract data paths
+        # First prioritize our pre-downloaded and extracted dataset
+        app_root = Path(__file__).parent.parent
+        local_extracted_dir = app_root / "data" / "datasets" / "movielens" / "ml-latest-small"
+        local_zip_path = app_root / "data" / "datasets" / "movielens" / "ml-latest-small.zip"
+        
+        # Default fallback path (for backward compatibility)
         movielens_dir = os.getenv("MOVIELENS_DATA_DIR", "ml-latest-small")
         
-        # Extract data from MovieLens dataset
-        logger.info(f"Extracting data from {movielens_dir}...")
-        if os.path.isdir(movielens_dir):
+        logger.info(f"Looking for MovieLens dataset in: {local_extracted_dir}")
+        
+        # Extract data from MovieLens dataset - first check our known local path
+        if local_extracted_dir.exists():
+            logger.info(f"Using pre-downloaded dataset at {local_extracted_dir}")
+            movies_df, ratings_df = extract_from_directory(local_extracted_dir)
+        elif os.path.isdir(movielens_dir):
+            logger.info(f"Using dataset at configured path: {movielens_dir}")
             movies_df, ratings_df = extract_from_directory(movielens_dir)
         else:
             # Try to download if directory doesn't exist
-            logger.warning(f"Directory {movielens_dir} not found, attempting to download dataset...")
-            if USE_LOCAL_STORAGE:
+            logger.warning(f"Dataset directory not found, attempting to obtain dataset...")
+            
+            # First check for local zip file
+            content = None
+            if local_zip_path.exists():
+                logger.info(f"Found local zip file at {local_zip_path}")
+                content = read_from_local(local_zip_path)
+            elif USE_LOCAL_STORAGE:
                 zip_path = os.path.join(LOCAL_DATA_DIR, DATASET_PATH, "ml-latest-small.zip")
                 if os.path.exists(zip_path):
+                    logger.info(f"Found local zip file at {zip_path}")
                     content = read_from_local(zip_path)
-                else:
-                    logger.error(f"ZIP file not found at {zip_path}")
-                    return False
-            else:
+            
+            # If no local file, try GCS
+            if not content and GCS_BUCKET_NAME:
+                logger.info("Attempting to download from Google Cloud Storage...")
                 content = download_from_gcs(GCS_BUCKET_NAME, f"{DATASET_PATH}/ml-latest-small.zip")
             
+            # If GCS fails, try direct download from MovieLens
             if not content:
-                logger.error("Failed to obtain dataset content")
+                logger.info("GCS download failed or not configured. Trying direct download from MovieLens...")
+                content = download_from_movielens()
+            
+            if not content:
+                logger.error("Failed to obtain dataset content from any source")
                 return False
                 
             movies_df, ratings_df = extract_movielens_data(content)

@@ -59,14 +59,16 @@ tmp/
 docs/_build/
 DEVELOPMENT.md
 
-# Data
-data/
-*.csv
-*.json
-*.pkl
-*.npy
-*.npz
+# # Data
+# data/
+# *.csv
+# *.json
+# *.pkl
+# *.npy
+# *.npz
 
+backend/app/IMPLEMENTATION_NOTES.md
+backend/app/SOLUTION_README.md
 # Jupyter Notebooks
 .ipynb_checkpoints
 
