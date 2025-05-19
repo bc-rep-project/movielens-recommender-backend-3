@@ -22,13 +22,13 @@ class MovieService:
     def _get_full_poster_url(self, poster_path: Optional[str]) -> Optional[str]:
         """Create a full poster URL from a relative path"""
         if not poster_path:
-            return None
+            return "/static/images/movie-placeholder.pgm"
         return f"{self.image_base_url}{poster_path}"
     
     def _get_full_backdrop_url(self, backdrop_path: Optional[str]) -> Optional[str]:
         """Create a full backdrop URL from a relative path"""
         if not backdrop_path:
-            return None
+            return "/static/images/movie-placeholder.pgm"
         return f"{self.image_base_url}{backdrop_path}".replace("w500", "original")
     
     async def get_movies(self, skip: int = 0, limit: int = 20) -> List[MovieResponse]:

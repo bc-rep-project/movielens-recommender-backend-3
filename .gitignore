@@ -45,6 +45,9 @@ htmlcov/
 .tox/
 nosetests.xml
 coverage.xml
+test_api.sh
+TESTING.md
+TESTING2.md
 
 # Temporary files
 *.bak

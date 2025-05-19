@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import time
 from loguru import logger
 from contextlib import asynccontextmanager
+import os
 
 from .api.api import api_router
 from .core.config import settings
@@ -63,6 +65,14 @@ async def add_process_time_header(request: Request, call_next):
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
+
+# Mount static files directory
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    logger.info(f"Static files mounted from {static_dir}")
+else:
+    logger.warning(f"Static directory not found at {static_dir}")
 
 # Root endpoint
 @app.get("/")

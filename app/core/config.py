@@ -184,6 +184,24 @@ class Settings(BaseSettings):
     # Data directories
     LOCAL_DATA_DIR: str = os.getenv("LOCAL_DATA_DIR", "./data")
     
+    # Data Pipeline and Model Settings
+    PIPELINE_MODE: str = os.getenv("PIPELINE_MODE", "full")
+    MIN_INTERACTIONS_THRESHOLD: int = int(os.getenv("MIN_INTERACTIONS_THRESHOLD", "50"))
+    RETRAIN_INTERVAL_DAYS: int = int(os.getenv("RETRAIN_INTERVAL_DAYS", "7"))
+    MODEL_STORAGE_PATH: str = os.getenv("MODEL_STORAGE_PATH", "/app/models")
+    MODEL_VERSION: str = os.getenv("MODEL_VERSION", "v1.0")
+    
+    # Fields that were missing and causing validation errors
+    USE_FULL_DATASET: bool = Field(default=False)
+    TEST_USER_EMAIL: Optional[str] = None
+    TEST_USER_PASSWORD: Optional[str] = None
+    
+    @field_validator("USE_FULL_DATASET", mode="before")
+    def parse_use_full_dataset(cls, v):
+        if isinstance(v, str):
+            return v.lower() == "true"
+        return v
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": True
